@@ -1,60 +1,87 @@
-clear all;
-%% Physical Constans
-epsilon_r = 80;
-k = 8.9876 / epsilon_r;%Column Constant
-k_b = 1.3806;%Boltzmann constant
-%% Experimental Conditions
-T = 300;
-L = [21544 21544 21544];%Box Size
-R = 7.5;%Radius of AuNPs
-pbc = [1, 1, 1];%periodic boundary condition
-%C = 65;%unit is in pM for pmol/L
-r_at_maxg = zeros();
-for C = 6 : 1 : 65
+clear,clc
+% % Vacuum permittivity
+% phys_const.epsilon0 = 8.8542;
+% % relative permittivity
+% phys_const.epsilonr = 80;
+% % Boltzmann constant
+% phys_const.kb = 1.3806;
+% % elementary positive charge
+% phys_const.e = 1.6;
+% % avogadro constant
+% phys_const.Na = 6.023;
+% % num of particles
+% phys_cond.numParticles = 1500;
+% % temperature of experiment
+% phys_cond.T = 323;
+% % length of the box
+% % phys_cond.L = 43088;
+% % radius of particle
+% phys_cond.R = 7.5;
+% % average electric charge
+% phys_cond.averagee = 300;
+% % photon wave length created by ATP
+% phys_cond.wavelambda = 7000;
+phys_cond = readstruct("phys_cond.xml");
+phys_const = readstruct("phys_const.xml");
+
+% numbers of bins
+Ng = 10000;
+diff_phase = zeros(size(20:200,2),1);
+g = zeros(Ng,size(20:1500,2));
+
+parfor D = 25:58
+    % D = 100;
+    distances  = D*100;
+    [cdInit,charge,L] = Init_D(distances,phys_cond,phys_const); % 'D' indicates distances corresponding to the concentration
+    for i = 1:5e5
+        %{
+            distance_step stands for distance per Monte_Carlo step.
+            For the sake of simulation speed, step value's supposed to be
+            large. Default setting is 0.1 times half of the length of box.
+        %}
+        distance_step = L * 0.1;
+        [cdMoved] = monte_carlo(phys_cond,phys_const,ceil(phys_cond.numParticles * rand),cdInit,charge,distance_step,L);
+        cdInit = cdMoved;
+    end
+
+    % fig = figure;
+    for i = 1:3e6
+        %{
+            distance_step stands for distance per Monte_Carlo step.
+            Now start moving to the equilibrium position in smaller steps. 
+            Default setting is 0.05 times half of the length of box.
+        %}
+        distance_step = L * 0.05;
+        [cdMoved] = monte_carlo(phys_cond,phys_const,ceil(phys_cond.numParticles * rand),cdInit,charge,distance_step,L);
+        cdInit = cdMoved;
+        % if rem(i,1000) == 0
+        %     plot3Dspheres(cdInit,numParticle,phys_cond)
+        %     hold off
+        %     frame = getframe(fig);
+        % end
+    end
+    % close;
     %%
-    N = num_of_particles(C);%from Molarity get number of particles in Box
-    %%
-    initialization(N, C);
-    %%
-    eval(['Coordin_Char = load(''coordinate',num2str(C),'.txt''',');'])
-    %% distribution initial state
-    % figure(1)
-    % for i=1:N
-    %     Plot_Spheres(Coordin_Char(i,1),Coordin_Char(i,2),Coordin_Char(i,3),R);
-    % %     hold on
-    % %     axis equal
-    %     grid on
-    % end
-    %%
-    MC_MD(Coordin_Char, L, T, N, k, k_b, R, C);
-    %%
-    eval(['Coordin_Char_steady = load(''coordinate_steady',num2str(C),'.txt''',');'])
-    %% distribution steady state
-    % figure(2)
-    % for i=1:N
-    %     Plot_Spheres(Coordin_Char_steady(i,1),Coordin_Char_steady(i,2),Coordin_Char_steady(i,3),R*10);
-    % %     hold on
-    % %     axis equal
-    %     grid on
-    % end
-    %% number of bins (number of data points in the figure below)
-    Ng = 900;
-    %%
-    [r,g,r_at_maxg(C)] = rdf(Coordin_Char_steady(:, 1 : 3), L, pbc, Ng, N);
-    %% plot rdf
-    % figure(3);
-    % plot(r, g, '-');
-    % xlim([0, 12000]);
-    % ylim([0, 1.5]);
-    % xlabel('r /nm', 'fontsize', 15);
-    % ylabel('g(r)', 'fontsize', 15);
-    % set(gca, 'fontsize', 15);
-    % grid on
+
+    for i = 1:1e6
+        %{
+            distance_step stands for distance per Monte_Carlo step.
+            Now it's the thermal motion after equilibrium. 
+            Default setting is 0.01 times half of the length of box.
+        %}
+        distance_step = L * 0.01;
+        [cdMoved] = monte_carlo(phys_cond,phys_const,ceil(phys_cond.numParticles * rand),cdInit,charge,distance_step,L);
+        if rem(i,10000) == 0
+            % g(:,D-24) = g(:,D-24) + rdf(cdMoved, L, Ng, phys_cond.numParticles);
+            % g(:,C-2) = rdf(cdMoved, phys_cond.L, Ng, numParticle);
+            % diff_phase(D-24) = diff_phase(D-24) + calculate_phase(phys_cond,cdMoved,L);
+            diff_phase(D-24) = diff_phase(D-24) + calculate_phase_simpler(phys_cond,cdMoved);
+        end
+        cdInit = cdMoved;
+    end
+    g(:,D-24) = g(:,D-24) / 100;
+    diff_phase(D-24) = diff_phase(D-24) / 100;
+    disp(D)
 end
-C = 1:1:65;
-figure;
-plot(C,r_at_maxg,'o-');
-xlabel('C/pM', 'fontsize', 15);
-ylabel('Corresponding Distance/nm', 'fontsize', 15);
-xlim([6, 65]);
-ylim([2000, 6000]);
+% plot((1:Ng)* 10000/Ng ,g) % !!!Caution: Value of rc in function 'rdf()' should be noted.
+% save('results_D.mat');
