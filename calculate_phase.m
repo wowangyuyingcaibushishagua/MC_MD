@@ -5,7 +5,7 @@ centerpoint = [0 0 0];
 % cutoff distance
 % rc = ceil(distances);
 rc = 1000;
-% generate photon several times
+% generate photon several times 
 for gen_time = 1:1e4
     r = cdMoved;
     % generate wave vector randomly in spherical coordinates

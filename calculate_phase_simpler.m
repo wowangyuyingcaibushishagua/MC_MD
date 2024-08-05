@@ -7,7 +7,7 @@ amplitude = 0;
 % cutoff distance
 % rc = ceil(distances);
 % rc = distances;
-% generate photon several times
+% generate photon several times 
 for find_count = 1:count
     r = cdMoved;
     % Wave Vector k

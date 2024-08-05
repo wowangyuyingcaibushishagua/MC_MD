@@ -20,7 +20,7 @@ clear,clc
 % % average electric charge
 % phys_cond.averagee = 300;
 % % photon wave length created by ATP
-% phys_cond.wavelambda = 7000;
+% phys_cond.wavelambda = 7000; 
 phys_cond = readstruct("phys_cond.xml");
 phys_const = readstruct("phys_const.xml");
 
